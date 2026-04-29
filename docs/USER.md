@@ -35,4 +35,3 @@ Maximum `head_dim` is `FLASH_ATTENTION_MAX_HEAD_DIM` (512). Return codes are lis
 ## Examples
 
 - `examples/bench_flash.c` — built by `make example-c`.
-- Technical narrative and benchmarks: see `Flash_Attention_Final_Report.ipynb` in the repository root.
