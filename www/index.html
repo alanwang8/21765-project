@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Needle Flash Attention</title>
+  <style>
+    :root {
+      --bg:       #ffffff;
+      --bg-alt:   #f7f7f8;
+      --text:     #1a1a1a;
+      --text-dim: #555555;
+      --accent:   #2563eb;
+      --border:   #e0e0e0;
+      --code-bg:  #1e1e2e;
+      --code-fg:  #cdd6f4;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:       #111827;
+        --bg-alt:   #1f2937;
+        --text:     #e5e7eb;
+        --text-dim: #9ca3af;
+        --accent:   #60a5fa;
+        --border:   #374151;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Georgia, serif;
+      font-size: 16px;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+    h2 {
+      font-size: 1.35rem; font-weight: 600;
+      margin: 2.5rem 0 0.65rem;
+      padding-top: 1.4rem;
+      border-top: 2px solid var(--accent);
+    }
+    h3 { font-size: 1rem; font-weight: 600; margin: 1.4rem 0 0.35rem; color: var(--text); }
+    p  { margin: 0.6rem 0; }
+    a  { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    ul, ol { padding-left: 1.4rem; margin: 0.5rem 0; }
+    li { margin: 0.2rem 0; }
+    sup { font-size: 0.75em; vertical-align: super; }
+
+    header { padding: 2.75rem 0 1.5rem; border-bottom: 1px solid var(--border); }
+    .subtitle { font-size: 1.05rem; color: var(--text-dim); margin: 0.45rem 0 0.3rem; }
+    .authors  { font-size: 0.9rem;  color: var(--text-dim); }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      padding: 0.5rem 0; overflow-x: auto; white-space: nowrap;
+    }
+    nav a { font-size: 0.875rem; margin-right: 1.2rem; color: var(--text-dim); font-weight: 500; }
+    nav a:hover { color: var(--accent); text-decoration: none; }
+
+    /* Abstract callout */
+    .abstract {
+      background: var(--bg-alt);
+      border-left: 4px solid var(--accent);
+      padding: 1rem 1.3rem;
+      border-radius: 0 4px 4px 0;
+      margin: 1.1rem 0;
+    }
+
+    /* Algorithm pseudocode */
+    .algorithm {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem 1.3rem;
+      margin: 1rem 0;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+    .alg-title {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Georgia, serif;
+      font-weight: 600; font-size: 0.9rem; color: var(--accent); margin-bottom: 0.55rem;
+    }
+    .i1 { padding-left: 1.5em; }
+    .i2 { padding-left: 3.0em; }
+    .i3 { padding-left: 4.5em; }
+    .kw  { color: #7c3aed; font-weight: 600; }
+    .cmt { color: var(--text-dim); font-style: italic; }
+    @media (prefers-color-scheme: dark) { .kw { color: #a78bfa; } }
+
+    /* Code blocks */
+    pre {
+      background: var(--code-bg); color: var(--code-fg);
+      border-radius: 6px; padding: 0.9rem 1.1rem;
+      overflow-x: auto;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.83rem; line-height: 1.6; margin: 0.9rem 0;
+    }
+    code {
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: 0.875em;
+      background: var(--bg-alt); border: 1px solid var(--border);
+      padding: 0.1em 0.4em; border-radius: 4px;
+    }
+    pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 0.8rem 0; }
+    th {
+      background: var(--bg-alt); font-weight: 600; text-align: left;
+      padding: 0.5rem 0.85rem; border: 1px solid var(--border);
+    }
+    td { padding: 0.5rem 0.85rem; border: 1px solid var(--border); }
+    tr:nth-child(even) td { background: var(--bg-alt); }
+    .num { text-align: right; font-family: ui-monospace, monospace; font-size: 0.83rem; }
+    .caption { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.3rem; }
+
+    /* ── Module / API Diagram ──────────────────────────── */
+    .mod-diagram {
+      margin: 1.3rem 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* Layer label + boxes row */
+    .mod-layer {
+      width: 100%;
+      display: flex;
+      align-items: stretch;
+      gap: 0.6rem;
+    }
+    .mod-layer-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      padding: 0.4rem 0.1rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .mod-boxes {
+      flex: 1;
+      display: flex;
+      gap: 0.6rem;
+      align-items: stretch;
+    }
+    .mod-box {
+      flex: 1;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      padding: 0.6rem 0.8rem;
+      background: var(--bg-alt);
+      font-size: 0.82rem;
+      min-width: 0;
+    }
+    .mod-box.accent { border-color: var(--accent); }
+    .mod-name {
+      font-weight: 700;
+      font-size: 0.88rem;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      color: var(--text);
+      margin-bottom: 0.3rem;
+    }
+    .mod-sig {
+      color: var(--text-dim);
+      font-size: 0.78rem;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      line-height: 1.45;
+    }
+    .mod-io {
+      margin-top: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--accent);
+      font-family: ui-monospace, monospace;
+    }
+    .mod-arrow {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+      padding: 0.25rem 0;
+      padding-left: 2.5rem; /* align with boxes (past the label column) */
+      width: 100%;
+    }
+    .mod-arrow::before { content: "↓"; font-size: 1rem; }
+
+    /* Architecture stack (Implementation section) */
+    .arch { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 1.3rem 0; }
+    .arch-box {
+      border: 2px solid var(--accent); border-radius: 6px;
+      padding: 0.5rem 1.3rem; text-align: center;
+      font-size: 0.86rem; min-width: 290px; background: var(--bg-alt);
+    }
+    .arch-sub { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.12rem; }
+    .arch-arrow { color: var(--text-dim); font-size: 1rem; line-height: 1; }
+    .arch-row { display: flex; gap: 1.25rem; justify-content: center; }
+    .arch-box-sm {
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 0.5rem 0.9rem; text-align: center;
+      font-size: 0.82rem; min-width: 180px; background: var(--bg-alt);
+    }
+
+    /* SVG chart */
+    .chart-wrap { margin: 1.2rem 0; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.3rem 0; font-size: 0.84rem; color: var(--text-dim);
+    }
+    main { padding-bottom: 4rem; }
+    section { padding: 0.1rem 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Needle Flash Attention</h1>
+  <p class="subtitle">Memory-efficient exact attention via online softmax in the Needle deep learning framework</p>
+  <p class="authors">Alan Wang &nbsp;·&nbsp; Zhanming (Jerry) Liang</p>
+</header>
+
+<nav aria-label="On-page navigation">
+  <a href="#abstract">Abstract</a>
+  <a href="#background">Background</a>
+  <a href="#algorithm">Algorithm</a>
+  <a href="#implementation">Implementation</a>
+  <a href="#api">API</a>
+  <a href="#results">Results</a>
+  <a href="#quickstart">Quick Start</a>
+  <a href="#references">References</a>
+</nav>
+
+<main>
+
+<!-- ── Abstract ──────────────────────────────────────── -->
+<section id="abstract">
+  <h2>Abstract</h2>
+  <div class="abstract">
+    <p>
+      We implement <strong>Flash Attention</strong> (Dao et al., 2022) in the <strong>Needle</strong>
+      deep learning framework — replacing the standard O(N²) attention matrix with an online softmax
+      recurrence that reduces working memory to O(N). Our contribution includes a tiled CUDA forward and
+      backward pass wired into Needle's autograd engine, a portable C reference implementation for
+      CPU testing, and a drop-in <code>use_flash_attention</code> flag on <code>MultiHeadAttention</code>.
+      Correctness is verified against pre-computed reference outputs across batch sizes, sequence lengths,
+      head configurations, and causal masking modes.
+    </p>
+  </div>
+</section>
+
+<!-- ── Background ────────────────────────────────────── -->
+<section id="background">
+  <h2>Background: The Quadratic Memory Problem</h2>
+
+  <p>
+    Standard attention computes O&nbsp;=&nbsp;softmax(QK<sup>T</sup>/√d)·V, which requires storing
+    the full N×N score matrix — <strong>O(N²) memory per head</strong>. Flash Attention avoids this
+    entirely by streaming over blocks and maintaining only two running scalars per query row.
+    The output is <em>bit-identical</em> to standard attention — it is not an approximation.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Sequence Length N</th>
+        <th>Standard (N×N matrix)</th>
+        <th>Flash (stats only)</th>
+        <th>Reduction</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>128</td>   <td class="num">256 KB</td>  <td class="num">4 KB</td>   <td class="num">64×</td>   </tr>
+      <tr><td>512</td>   <td class="num">4 MB</td>    <td class="num">16 KB</td>  <td class="num">256×</td>  </tr>
+      <tr><td>1 024</td> <td class="num">16 MB</td>   <td class="num">32 KB</td>  <td class="num">512×</td>  </tr>
+      <tr><td>4 096</td> <td class="num">256 MB</td>  <td class="num">128 KB</td> <td class="num">2 048×</td></tr>
+    </tbody>
+  </table>
+  <p class="caption">Per head (B=1, H=1), float32. Standard: N²×4 B. Flash: N×2×4 B (running max m and normalizer l).</p>
+</section>
+
+<!-- ── Algorithm ─────────────────────────────────────── -->
+<section id="algorithm">
+  <h2>Algorithm</h2>
+
+  <p>
+    Instead of computing all scores first then normalizing, Flash Attention maintains a running
+    maximum m<sub>i</sub> and normalizer l<sub>i</sub> per query row. When a larger score arrives,
+    the accumulated output is rescaled by exp(m<sub>prev</sub>−m<sub>i</sub>) — keeping results
+    numerically stable without an N×N buffer.
+  </p>
+
+  <div class="algorithm">
+    <div class="alg-title">Forward — Online Softmax Recurrence</div>
+    <div><span class="kw">for each</span> (batch <i>b</i>, head <i>h</i>):</div>
+    <div class="i1"><span class="kw">for</span> query row <i>i</i> = 0…N−1:</div>
+    <div class="i2">m<sub>i</sub> ← −∞,&nbsp; l<sub>i</sub> ← 0,&nbsp; o<sub>i</sub> ← <b>0</b> &nbsp;<span class="cmt">// init running max, denom, output</span></div>
+    <div class="i2"><span class="kw">for</span> key col <i>j</i> = 0…N−1: &nbsp;<span class="cmt">(skip j &gt; i if causal)</span></div>
+    <div class="i3">s<sub>ij</sub>  ← Q[i] · K[j] / √D</div>
+    <div class="i3">m<sub>prev</sub> ← m<sub>i</sub> &nbsp;;&nbsp; m<sub>i</sub> ← max(m<sub>prev</sub>, s<sub>ij</sub>)</div>
+    <div class="i3">P<sub>ij</sub>  ← exp(s<sub>ij</sub> − m<sub>i</sub>)</div>
+    <div class="i3">l<sub>i</sub>   ← exp(m<sub>prev</sub> − m<sub>i</sub>) · l<sub>i</sub> + P<sub>ij</sub></div>
+    <div class="i3">o<sub>i</sub>   ← exp(m<sub>prev</sub> − m<sub>i</sub>) · o<sub>i</sub> + P<sub>ij</sub> · V[j]</div>
+    <div class="i2">O[i] ← o<sub>i</sub> / l<sub>i</sub> &nbsp;<span class="cmt">// persist m<sub>i</sub>, l<sub>i</sub> for backward</span></div>
+  </div>
+
+  <p>
+    <strong>Backward pass</strong> reuses the saved (m, l) to recompute attention weights without
+    storing the N×N probability matrix. Two CUDA kernels run sequentially:
+    (1) <em>ComputeDelta</em> — row-wise δ<sub>i</sub> = Σ<sub>j</sub> P<sub>ij</sub> · (∂O<sub>i</sub>·V[j]);
+    (2) <em>AccumulateGradients</em> — ∂Q, ∂K, ∂V via recomputed P<sub>ij</sub>,
+    using <code>atomicAdd</code> for ∂K and ∂V.
+  </p>
+</section>
+
+<!-- ── Implementation ────────────────────────────────── -->
+<section id="implementation">
+  <h2>Implementation</h2>
+
+  <p>Four layers from user API to hardware, with the CUDA path for training and a standalone C path for correctness testing:</p>
+
+  <div class="arch">
+    <div class="arch-box">
+      <strong>Python Neural Network Modules</strong>
+      <div class="arch-sub">
+        <code>nn.TransformerLayer</code> &nbsp;·&nbsp; <code>nn.AttentionLayer</code> &nbsp;·&nbsp; <code>nn.MultiHeadAttention</code>
+      </div>
+    </div>
+    <div class="arch-arrow">↓</div>
+    <div class="arch-box">
+      <strong>Autograd Operation</strong>
+      <div class="arch-sub">
+        <code>ops.flash_attention(Q, K, V, causal=True)</code> &nbsp;—&nbsp;
+        caches m, l on output NDArray for backward
+      </div>
+    </div>
+    <div class="arch-arrow">↓</div>
+    <div class="arch-row">
+      <div class="arch-box-sm">
+        <strong>CUDA Backend</strong>
+        <div class="arch-sub">
+          Forward + Backward kernels<br>
+          <code>ndarray_backend_cuda.cu</code>
+        </div>
+      </div>
+      <div class="arch-box-sm">
+        <strong>C CPU Reference</strong>
+        <div class="arch-sub">
+          <code>flash_attention_cpu_forward()</code><br>
+          <code>c_api/</code> · optional OpenMP
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p>
+    The forward CUDA kernel launches on grid <code>dim3(batch, heads)</code> with block width
+    <code>head_dim</code> — each thread owns one element of the head dimension and accumulates
+    a register scalar while streaming over all key positions.
+    <code>FlashAttention</code> extends Needle's <code>TensorOp</code>, attaching (m, l) to the
+    output so the backward pass can recompute attention weights without re-running the forward.
+  </p>
+</section>
+
+<!-- ── API / Modules ─────────────────────────────────── -->
+<section id="api">
+  <h2>API &amp; Module Map</h2>
+
+  <div class="mod-diagram">
+
+    <!-- nn layer -->
+    <div class="mod-layer">
+      <div class="mod-layer-label">needle.nn</div>
+      <div class="mod-boxes">
+        <div class="mod-box">
+          <div class="mod-name">TransformerLayer</div>
+          <div class="mod-sig">q_features, num_head, dim_head,<br>hidden_size, dropout=0., causal=True</div>
+          <div class="mod-io">in/out (B, T, D) — attn + FFN + residual + norm</div>
+        </div>
+        <div class="mod-box">
+          <div class="mod-name">AttentionLayer</div>
+          <div class="mod-sig">q_features, num_head, dim_head,<br>use_flash_attention=False, causal=True</div>
+          <div class="mod-io">in/out (B, T, D) — proj + attn + out proj</div>
+        </div>
+        <div class="mod-box">
+          <div class="mod-name">MultiHeadAttention</div>
+          <div class="mod-sig">causal=False, dropout=0.,<br>use_flash_attention=False</div>
+          <div class="mod-io">in (B, H, T, d) × 3 → out (B, H, T, d)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mod-arrow">when use_flash_attention=True, delegates to</div>
+
+    <!-- ops layer -->
+    <div class="mod-layer">
+      <div class="mod-layer-label">needle.ops</div>
+      <div class="mod-boxes">
+        <div class="mod-box accent">
+          <div class="mod-name">flash_attention(Q, K, V, causal=False, block_m=128, block_n=None)</div>
+          <div class="mod-sig">FlashAttention(TensorOp) · compute() → calls CUDA forward, attaches m/l<br>FlashAttentionGrad(TensorTupleOp) · retrieves cached m/l, calls CUDA backward</div>
+          <div class="mod-io">CUDA only · in/out (B, H, T, d) · probs not returned (would negate savings)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mod-arrow">device dispatch</div>
+
+    <!-- backend layer -->
+    <div class="mod-layer">
+      <div class="mod-layer-label">backends</div>
+      <div class="mod-boxes">
+        <div class="mod-box">
+          <div class="mod-name">FlashAttentionForwardKernel<br>FlashAttentionBackwardKernel</div>
+          <div class="mod-sig">grid dim3(batch, heads) · block dim head_dim<br>ComputeDeltaKernel + gradient accumulation</div>
+          <div class="mod-io">ndarray_backend_cuda.cu</div>
+        </div>
+        <div class="mod-box">
+          <div class="mod-name">flash_attention_cpu_forward(Q, K, V, O, params)</div>
+          <div class="mod-sig">standalone C11 · no GPU required<br>returns FLASH_ATTENTION_OK or error code<br>max head_dim 512 · optional -DUSE_OPENMP</div>
+          <div class="mod-io">c_api/src/flash_attention.c</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="font-size:0.85rem">
+    Full documentation:
+    <a href="../docs/USER.md">docs/USER.md</a> &nbsp;·&nbsp;
+    <a href="../docs/DEVELOPER.md">docs/DEVELOPER.md</a> &nbsp;·&nbsp;
+    <a href="../man/flash_attention.3">man flash_attention(3)</a>
+  </p>
+</section>
+
+<!-- ── Results ───────────────────────────────────────── -->
+<section id="results">
+  <h2>Results</h2>
+
+  <h3>CPU Reference Benchmark</h3>
+  <p>
+    Single-threaded, causal masking, B=1 H=4 D=64. Run with <code>make example-c</code>.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>N</th>
+        <th>Time</th>
+        <th>N²</th>
+        <th>Ratio vs N=128</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>128</td>   <td class="num">0.0013 s</td> <td class="num">16 384</td>    <td class="num">1×</td></tr>
+      <tr><td>512</td>   <td class="num">0.0205 s</td> <td class="num">262 144</td>   <td class="num">15.8×</td></tr>
+      <tr><td>1 024</td> <td class="num">0.0554 s</td> <td class="num">1 048 576</td> <td class="num">42.6×</td></tr>
+    </tbody>
+  </table>
+  <p class="caption">Scales O(N²·D) as expected (theoretical 16× and 64×; observed slightly lower due to cache effects at small N).</p>
+
+  <div class="chart-wrap">
+    <svg viewBox="0 0 520 205" xmlns="http://www.w3.org/2000/svg"
+         style="width:100%;max-width:520px;display:block;margin:0 auto;">
+      <style>
+        .ca { stroke: #888; stroke-width: 1.5; }
+        .cg { stroke: #ccc; stroke-width: 0.75; stroke-dasharray: 4 3; }
+        .cb { fill: #2563eb; }
+        .ct { fill: #555; font-size: 11px; font-family: ui-monospace, monospace; }
+        .cl { fill: #888; font-size: 10px; font-family: ui-monospace, monospace; }
+        @media (prefers-color-scheme: dark) {
+          .cg { stroke: #374151; }
+          .ct { fill: #9ca3af; }
+          .cl { fill: #6b7280; }
+        }
+      </style>
+      <line class="ca" x1="62" y1="10" x2="62" y2="160"/>
+      <line class="ca" x1="62" y1="160" x2="480" y2="160"/>
+      <text class="cl" x="18" y="88" text-anchor="middle" transform="rotate(-90,18,88)">Time (s)</text>
+      <line class="cg" x1="62" y1="160" x2="480" y2="160"/>
+      <line class="cg" x1="62" y1="110" x2="480" y2="110"/>
+      <line class="cg" x1="62" y1="60"  x2="480" y2="60"/>
+      <line class="cg" x1="62" y1="10"  x2="480" y2="10"/>
+      <text class="cl" x="57" y="163" text-anchor="end">0</text>
+      <text class="cl" x="57" y="113" text-anchor="end">0.02</text>
+      <text class="cl" x="57" y="63"  text-anchor="end">0.04</text>
+      <text class="cl" x="57" y="13"  text-anchor="end">0.06</text>
+      <!-- N=128 -->
+      <rect class="cb" x="110" y="156.75" width="80" height="3.25" rx="2"/>
+      <text class="ct" x="150" y="148" text-anchor="middle">0.0013 s</text>
+      <text class="cl" x="150" y="178" text-anchor="middle">N=128</text>
+      <!-- N=512 -->
+      <rect class="cb" x="230" y="108.75" width="80" height="51.25" rx="2"/>
+      <text class="ct" x="270" y="100" text-anchor="middle">0.0205 s</text>
+      <text class="cl" x="270" y="178" text-anchor="middle">N=512</text>
+      <!-- N=1024 -->
+      <rect class="cb" x="350" y="21.5" width="80" height="138.5" rx="2"/>
+      <text class="ct" x="390" y="14" text-anchor="middle">0.0554 s</text>
+      <text class="cl" x="390" y="178" text-anchor="middle">N=1024</text>
+      <text class="cl" x="271" y="198" text-anchor="middle">Sequence length</text>
+    </svg>
+  </div>
+
+  <h3>Correctness Verification</h3>
+  <p>
+    The Python test suite validates <code>MultiHeadAttention</code>, <code>AttentionLayer</code>,
+    <code>TransformerLayer</code>, and <code>Transformer</code> against pre-computed float32 reference
+    outputs (<code>atol=1e-5</code>), parametrized over batch&nbsp;∈&nbsp;{4,8},
+    seq_len&nbsp;∈&nbsp;{5,11,31}, heads&nbsp;∈&nbsp;{4,5,8}, head_dim&nbsp;∈&nbsp;{8,32,64},
+    causal&nbsp;∈&nbsp;{True,False}, device&nbsp;∈&nbsp;{cpu,cuda}.
+    The C reference test (<code>make test-c</code>) additionally verifies online softmax vs. naive
+    attention at <code>atol=1e-4</code>.
+  </p>
+</section>
+
+<!-- ── Quick Start ───────────────────────────────────── -->
+<section id="quickstart">
+  <h2>Quick Start</h2>
+
+  <pre><code># Build Needle backends (requires CMake, pybind11)
+make lib
+
+# C reference — no Python/CUDA required
+make c-api &amp;&amp; make test-c &amp;&amp; make example-c</code></pre>
+
+  <pre><code>import needle as ndl, needle.nn as nn
+
+# Drop-in: add use_flash_attention=True to any AttentionLayer
+layer = nn.AttentionLayer(
+    q_features=256, num_head=8, dim_head=32,
+    causal=True, use_flash_attention=True,
+    device=ndl.cuda()
+)
+output = layer(x)   # x: (batch, seq_len, 256)
+
+# Or call the op directly (Q,K,V shape: batch, heads, seq_len, head_dim)
+from needle.ops import flash_attention
+output = flash_attention(Q, K, V, causal=True)</code></pre>
+
+  <pre><code>// C API
+#include "flash_attention.h"
+FlashAttentionParams p = {.batch=1,.heads=4,.seq_len=1024,.head_dim=64,.causal=1};
+flash_attention_cpu_forward(Q, K, V, O, &amp;p);</code></pre>
+
+  <p style="font-size:0.85rem">
+    Platform-specific build instructions and OpenMP setup: <a href="../docs/INSTALL.md">docs/INSTALL.md</a>
+  </p>
+</section>
+
+<!-- ── References ────────────────────────────────────── -->
+<section id="references">
+  <h2>References</h2>
+  <ol>
+    <li>
+      Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, Christopher Ré.
+      <strong>FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness.</strong>
+      <em>NeurIPS</em>, 2022.
+    </li>
+    <li>
+      Zico Kolter and David Guestrin.
+      <em>Deep Learning Systems.</em> Carnegie Mellon University, 2023. (Needle framework open-source materials)
+    </li>
+  </ol>
+</section>
+
+</main>
+
+<footer>
+  <p>
+    MIT License &nbsp;·&nbsp;
+    <a href="../CREDITS">Credits</a> &nbsp;·&nbsp;
+    <a href="../SECURITY.md">Security</a> &nbsp;·&nbsp;
+    <a href="../HISTORY.md">History</a>
+  </p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+c_api/build/
+
+# Windows
+desktop.ini
+Thumbs.db
+
+# Data and submissions (large downloaded datasets)
+*.tar.gz
+data/
+!tests/attention/data/
+!tests/attention/data/*.npy
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,11 @@
+Needle Flash Attention — credits
+
+Core implementation and report
+  Alan Wang
+  Zhanming (Jerry) Liang
+
+Needle framework: original ndarray engine design from the CMU deep-learning-systems
+open-source materials; Flash attention integration and CPU C reference layer by
+the authors above.
+
+FlashAttention algorithm: Tri Dao et al., NeurIPS 2022.

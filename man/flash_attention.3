@@ -1,0 +1,27 @@
+.TH FLASH_ATTENTION 3 "April 2025" "Needle Flash Attention" "Library functions"
+.SH NAME
+flash_attention_cpu_forward \- CPU reference scaled dot-product attention
+.SH SYNOPSIS
+.nf
+\fB#include <flash_attention.h>\fP
+.sp
+\fBint flash_attention_cpu_forward(const float *\fIQ\fP, const float *\fIK\fP,
+    const float *\fIV\fP, float *\fIO\fP, const FlashAttentionParams *\fIp\fP);\fP
+.fi
+.SH DESCRIPTION
+Computes one forward pass of multi-head scaled dot-product attention with an
+online softmax (Flash-style), on the host, in single precision.
+Tensors \fIQ\fP, \fIK\fP, \fIV\fP, and \fIO\fP use row-major compact layout with index
+(((batch * heads + head) * seq_len + pos) * head_dim) + d.
+.PP
+The \fIFlashAttentionParams\fP structure supplies batch size, number of heads,
+sequence length, head dimension, reserved block fields, and a boolean-style
+\fIcausal\fP flag (non-zero enables autoregressive masking).
+.PP
+\fIhead_dim\fP must not exceed \fBFLASH_ATTENTION_MAX_HEAD_DIM\fP (512).
+.SH RETURN VALUE
+Returns \fBFLASH_ATTENTION_OK\fP on success, or a negative error code on failure.
+.SH FILES
+\fIc_api/include/flash_attention.h\fP, \fIc_api/src/flash_attention.c\fP.
+.SH SEE ALSO
+The repository \fBdocs/USER.md\fP and \fBdocs/DEVELOPER.md\fP.
