@@ -9,7 +9,7 @@ Memory-efficient **scaled dot-product attention** (Flash-style online softmax) i
 | Build and platforms | [docs/INSTALL.md](docs/INSTALL.md) |
 | Using Flash attention from Python | [docs/USER.md](docs/USER.md) |
 | Algorithms and code map | [docs/DEVELOPER.md](docs/DEVELOPER.md) |
-| Project overview (HTML) | [www/index.html](www/index.html) |
+| Project overview (HTML) | [docs/index.html](docs/index.html) |
 | Benchmarks and report (Jupyter) | [Flash_Attention_Final_Report.ipynb](Flash_Attention_Final_Report.ipynb) |
 | Man page (library API) | [man/flash_attention.3](man/flash_attention.3) (`man ./man/flash_attention.3` from repo root) |
 
